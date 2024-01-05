@@ -2,10 +2,9 @@ import os
 import sys
 import random
 import requests
-import numpy as np
 import pandas as pd
 
-from PyQt5.QtWidgets import QApplication, QDialog, QPushButton, QLabel
+from PyQt5.QtWidgets import QApplication, QDialog, QPushButton, QLabel, QTableWidgetItem, QTableWidget
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5 import uic
 
@@ -13,18 +12,50 @@ BUTTONNAMES = ['Image_1','Image_2']
 PET = ['Dog','Cat']
 RESOURCES = 'resources'
 
+class ClickMetrics(QDialog):
+    
+    def __init__(self):
+        super(ClickMetrics, self).__init__()
+        uic.loadUi(r'C:\\Users\\v.gialis\\OneDrive - pellencst.com\\Documents\\internship\\Alternance\\03_M2_T3I\\06 - Projet\\08 - Captcha\\Metrics.ui',self)
+
+        self.table_widget = self.findChild(QTableWidget,'tableWidget')
+        self.load_csv()
+
+    def load_csv(self):
+        filepath = os.path.join(os.getcwd(),'metric','data.csv')
+        try:
+            df = pd.read_csv(filepath)
+            self.display_data(df)
+        except Exception as e:
+            print("Error loading CSV:", e)
+
+    def display_data(self, data):
+        self.table_widget.setRowCount(data.shape[0])
+        self.table_widget.setColumnCount(data.shape[1])
+        self.table_widget.setHorizontalHeaderLabels(data.columns)
+
+        for row in range(data.shape[0]):
+            for col in range(data.shape[1]):
+                item = QTableWidgetItem(str(data.iloc[row, col]))
+                self.table_widget.setItem(row, col, item)
+
 class Captcha(QDialog):
 
     def __init__(self):
         super(Captcha, self).__init__()
         uic.loadUi(r'C:\\Users\\v.gialis\\OneDrive - pellencst.com\\Documents\\internship\\Alternance\\03_M2_T3I\\06 - Projet\\08 - Captcha\\Captcha.ui',self)
 
+        self.window = None
         # Initialisation des images
         self.set_picture_button()
 
         # Connection du bouton Next à son Event
         button_next = self.findChild(QPushButton,'nextImage')
         button_next.clicked.connect(self.change_image)
+
+        # Connection du bouton Click Metrics à son Event
+        button_metric = self.findChild(QPushButton,'clickMetrics')
+        button_metric.clicked.connect(self.display_metrics_window)
 
     def set_picture_button(self):
         # On sélectionne aléatoirement le chien ou le chat
@@ -96,7 +127,7 @@ class Captcha(QDialog):
     def change_image(self):
         question_label = self.findChild(QLabel,'validationLabel')
         question_label.setText('')
-        
+
         self.set_picture_button()
     
     def strore_click_metric(self,url:str,pet:str,validstate:bool):
@@ -124,6 +155,11 @@ class Captcha(QDialog):
                 df.loc[index[0],'Not_valid'] = df.loc[index[0],'Not_valid'] + 1
         
         df.to_csv(filepath,index=False)
+    
+    def display_metrics_window(self):
+        if self.window is None:
+            self.window = ClickMetrics()
+        self.window.show()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
