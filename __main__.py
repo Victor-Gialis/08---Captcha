@@ -4,8 +4,8 @@ import random
 import requests
 import pandas as pd
 
-from PyQt5.QtWidgets import QApplication, QDialog, QPushButton, QLabel, QTableWidgetItem, QTableWidget
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtWidgets import QApplication, QDialog, QPushButton, QLabel, QTableWidgetItem, QTableWidget,QGraphicsView, QGraphicsTextItem, QGraphicsScene
+from PyQt5.QtGui import QIcon, QPixmap, QColor, QPen, QFont
 from PyQt5 import uic
 
 BUTTONNAMES = ['Image_1','Image_2']
@@ -19,7 +19,17 @@ class ClickMetrics(QDialog):
         uic.loadUi(r'C:\\Users\\v.gialis\\OneDrive - pellencst.com\\Documents\\internship\\Alternance\\03_M2_T3I\\06 - Projet\\08 - Captcha\\Metrics.ui',self)
 
         self.table_widget = self.findChild(QTableWidget,'tableWidget')
+        self.total_label = self.findChild(QLabel,'totalLabel')
+        self.valid_label = self.findChild(QLabel,'validLabel')
+        self.not_valid_label = self.findChild(QLabel,'notvalidLabel')
+
         self.load_csv()
+
+        self.close_button = self.findChild(QPushButton,'closeButton')
+        self.close_button.clicked.connect(self.closeDialog)
+    
+    def closeDialog(self):
+        self.accept()
 
     def load_csv(self):
         filepath = os.path.join(os.getcwd(),'metric','data.csv')
@@ -39,6 +49,55 @@ class ClickMetrics(QDialog):
                 item = QTableWidgetItem(str(data.iloc[row, col]))
                 self.table_widget.setItem(row, col, item)
 
+        pie_chart = self.findChild(QGraphicsView,'graphicsView')
+        scene = QGraphicsScene()
+        pie_chart.setScene(scene)
+
+        # On calcul le nombre total de clics sur toutes les images
+        total_click = data["Total_click"].sum()
+
+        self.total_label.setText(f'Total click : {total_click}')
+        self.valid_label.setText(f'Total valid click : {data["Valid"].sum()}')
+        self.not_valid_label.setText(f'Total not valid click : {data["Not_valid"].sum()}')
+
+        # On calcul le nombre total de clics sur toutes les images en fonction des animaux représentés
+        total_dog_click = data.loc[data['Pet'] == 'Dog']['Total_click'].sum()
+        total_cat_click = data.loc[data['Pet'] == 'Cat']['Total_click'].sum()
+
+        values = [total_dog_click,total_cat_click]
+        colors = [QColor("#A8ACE1"), QColor("#4F59EA")]
+        start_angle = 0
+
+        # Dessiner chaque portion du pie chart
+        for value, color in zip(values, colors):
+            # Calculer l'angle de la portion actuelle
+            angle = value * 360 / total_click
+            print(angle)
+
+            # Créer un arc pour représenter cette portion
+            arc = scene.addEllipse(-100, -100, 200, 200, QPen(color), color)
+            arc.setStartAngle(int(start_angle) * 16)
+            arc.setSpanAngle(int(angle) * 16)
+
+            # Mise à jour de l'angle de départ pour la prochaine portion
+            start_angle += angle
+        
+        # Calcul du pourcentage de cette portion
+        percentage = (values/total_click)*100
+
+        # Ajouter une légende
+        legend = ["Dog", "Cat"]  # Exemple de légende
+        for i, label in enumerate(legend):
+            text = QGraphicsTextItem(f'{label} : {percentage[i]:.1f} %')
+            text.setDefaultTextColor(colors[i])
+            text.setFont(QFont("Arial", 10))
+            text.setPos(150, i * 20)
+            scene.addItem(text)
+
+        # Ajouter un titre
+        title_text = scene.addText('Pet pictutes - Click repartition', QFont("Arial", 12))
+        title_text.setPos(-50, -150)
+        
 class Captcha(QDialog):
 
     def __init__(self):
@@ -159,7 +218,12 @@ class Captcha(QDialog):
     def display_metrics_window(self):
         if self.window is None:
             self.window = ClickMetrics()
-        self.window.show()
+            self.window.finished.connect(self.deleteSecondWindow)
+            self.window.show()
+
+    def deleteSecondWindow(self):
+        self.window.deleteLater()
+        self.window = None
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
