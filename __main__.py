@@ -4,7 +4,7 @@ import random
 import requests
 import pandas as pd
 
-from PyQt5.QtWidgets import QApplication, QDialog, QPushButton, QLabel, QTableWidgetItem, QTableWidget,QGraphicsView, QGraphicsTextItem, QGraphicsScene
+from PyQt5.QtWidgets import QApplication,QMenu, QMainWindow, QDialog, QAction, QPushButton, QStatusBar, QLabel, QTableWidgetItem, QTableWidget,QGraphicsView, QGraphicsTextItem, QGraphicsScene, QFileDialog
 from PyQt5.QtGui import QIcon, QPixmap, QColor, QPen, QFont
 from PyQt5 import uic
 
@@ -16,7 +16,7 @@ class ClickMetrics(QDialog):
     
     def __init__(self):
         super(ClickMetrics, self).__init__()
-        uic.loadUi(r'C:\\Users\\v.gialis\\OneDrive - pellencst.com\\Documents\\internship\\Alternance\\03_M2_T3I\\06 - Projet\\08 - Captcha\\Metrics.ui',self)
+        uic.loadUi(r'Metrics.ui',self)
 
         self.table_widget = self.findChild(QTableWidget,'tableWidget')
         self.total_label = self.findChild(QLabel,'totalLabel')
@@ -98,39 +98,62 @@ class ClickMetrics(QDialog):
         title_text = scene.addText('Pet pictutes - Click repartition', QFont("Arial", 12))
         title_text.setPos(-50, -150)
         
-class Captcha(QDialog):
+class MainWindow(QMainWindow):
 
     def __init__(self):
-        super(Captcha, self).__init__()
-        uic.loadUi(r'C:\\Users\\v.gialis\\OneDrive - pellencst.com\\Documents\\internship\\Alternance\\03_M2_T3I\\06 - Projet\\08 - Captcha\\Captcha.ui',self)
+        super(MainWindow, self).__init__()
+        uic.loadUi(r'MainWindow.ui',self)
+        self.df = None
 
-        self.window = None
-        # Initialisation des images
-        self.set_picture_button()
+        # Connection des actions pour le menu File
+        browse_action = self.findChild(QAction,'Browse')
+        browse_action.triggered.connect(self.browse)
 
-        # Connection du bouton Next à son Event
-        button_next = self.findChild(QPushButton,'nextImage')
-        button_next.clicked.connect(self.change_image)
+        next_action = self.findChild(QAction,'Next') 
+        next_action.triggered.connect(self.change_image)
 
-        # Connection du bouton Click Metrics à son Event
-        button_metric = self.findChild(QPushButton,'clickMetrics')
-        button_metric.clicked.connect(self.display_metrics_window)
+        # Connection des actions pour le menu Edit
+        metric_action = self.findChild(QAction,'Metrics')
+        metric_action.triggered.connect(self.display_metrics_window)
+
+        # Connection du bouton Next pour changer les images
+        next_button = self.findChild(QPushButton,'NextButton') 
+        next_button.clicked.connect(self.change_image)
+
+        # On créé la barre de statuts (de type QStatusBar) avec son message initial
+        self.statusBar().showMessage("Label 0 : Initialisation") 
+    
+    # Action qui permet de charger le fichier csv avec les url des images
+    def browse(self):
+        self.statusBar().showMessage("Label 2 : Browse data file") 
+        file_filter = 'Data File (*.xlsx *.csv)'
+        response = QFileDialog.getOpenFileName(
+            parent = self,
+            caption='Select a data file',
+            directory=os.getcwd(),
+            filter=file_filter,
+        )
+        self.df = pd.read_csv(response[0],sep=';')
+        self.change_image()
 
     def set_picture_button(self):
-        # On sélectionne aléatoirement le chien ou le chat
-        self.pet_selected = PET[random.randint(0,1)]
+        self.statusBar().showMessage("Label 3 : Set pictures") 
+        # On sélectionne aléatoirement en fonction de la colonne description du fichier de données
+        DESCRIPTIONS = list(self.df['Description'].unique())
+        self.descriptions_selected = random.sample(DESCRIPTIONS,2)
+        self.true_description = self.descriptions_selected[random.randint(0,1)]
 
         question_label = self.findChild(QLabel,'questionLabel')
-        question_label.setText(f'Where is the {self.pet_selected} ?')
+        question_label.setText(f'Where is the {self.true_description} ?')
 
-        random.shuffle(PET)
         self.image_attributions = dict()
 
-        for objectName,pet in zip(BUTTONNAMES,PET) :
-            df = pd.read_csv(os.path.join(os.getcwd(),RESOURCES,pet+'.csv')) # Chargement du tableur excel contenant les url des images
-            image_url = df.sample().values[0][0] # Sélection aléatoire d'un url
+        for objectName,description in zip(BUTTONNAMES,self.descriptions_selected) :
+            frame = self.df.loc[self.df['Description']==description]
+            row_selected = frame.sample(n=1)
 
-            self.image_attributions[objectName] = {'Url':image_url,'Pet':pet,'Nbr_click':0}
+            image_url = row_selected['Url'].values[0]
+            self.image_attributions[objectName] = {'Url':image_url,'Description':description,'Nbr_click':0}
 
             button = self.findChild(QPushButton, objectName)
             button.clicked.connect(self.check_image)       
@@ -158,15 +181,17 @@ class Captcha(QDialog):
                 # Redimensionner le bouton pour qu'il corresponde à la taille de l'image
                 button.setFixedSize(image_width, image_height)
                 button.setIconSize(pixmap.rect().size())
+        self.statusBar().showMessage("Label 1 : Waiting action") 
     
     def check_image(self):
+        self.statusBar().showMessage("Label 4 : Check picture") 
         sender = self.sender() # Récupérer le bouton qui a émis le signal
         object_name = sender.objectName()
 
         # On compte le nombre de clics par image
         self.image_attributions[object_name]['Nbr_click'] += 1
 
-        if self.image_attributions[object_name]['Pet'] == self.pet_selected :
+        if self.image_attributions[object_name]['Description'] == self.true_description:
             print('click validate')
             validstate = True
             validationtext = 'Good job ! You find the good one !'
@@ -180,22 +205,23 @@ class Captcha(QDialog):
         question_label.setText(validationtext)
 
         url =self.image_attributions[object_name]['Url']
-        pet = self.image_attributions[object_name]['Pet']
-        self.strore_click_metric(url,pet,validstate)
+        description = self.image_attributions[object_name]['Description']
+        self.strore_click_metric(url,description,validstate)
+        self.statusBar().showMessage("Label 1 : Waiting action") 
 
     def change_image(self):
+        self.statusBar().showMessage("Label 5 : Next pictures") 
         question_label = self.findChild(QLabel,'validationLabel')
         question_label.setText('')
-
         self.set_picture_button()
     
-    def strore_click_metric(self,url:str,pet:str,validstate:bool):
+    def strore_click_metric(self,url:str,description:str,validstate:bool):
         filepath = os.path.join(os.getcwd(),'metric','data.csv')
         df = pd.read_csv(filepath)
 
         if not (df['Url'].eq(url)).any():
             body = {'Url':url,
-                    'Pet':pet,
+                    'Description':description,
                     'Total_click':[0],
                     'Valid':[0],
                     'Not_valid':[0]
@@ -227,6 +253,6 @@ class Captcha(QDialog):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    captcha = Captcha()
+    captcha = MainWindow()
     captcha.show()
-    sys.exit(captcha.exec_())
+    sys.exit(app.exec_())
