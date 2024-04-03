@@ -1,3 +1,9 @@
+__authors__ = ("Victor Gialis")
+__contact__ = ("victor.gialis@gmail.com")
+__copyright__ = "Université Jean-Monnet"
+__date__ = "2024-03-04"
+__version__= "1.1"
+
 import os
 import sys
 import random
@@ -8,13 +14,13 @@ from PyQt5.QtWidgets import QApplication,QMenu, QMainWindow, QDialog, QAction, Q
 from PyQt5.QtGui import QIcon, QPixmap, QColor, QPen, QFont
 from PyQt5 import uic
 
-BUTTONNAMES = ['Image_1','Image_2']
-PET = ['Dog','Cat']
+BUTTON_NAMES = ['Image_1','Image_2']
 RESOURCES = 'resources'
 
 class ClickMetrics(QDialog):
     
     def __init__(self):
+        print('oui')
         super(ClickMetrics, self).__init__()
         uic.loadUi(r'Metrics.ui',self)
 
@@ -61,11 +67,11 @@ class ClickMetrics(QDialog):
         self.not_valid_label.setText(f'Total not valid click : {data["Not_valid"].sum()}')
 
         # On calcul le nombre total de clics sur toutes les images en fonction des animaux représentés
-        total_dog_click = data.loc[data['Pet'] == 'Dog']['Total_click'].sum()
-        total_cat_click = data.loc[data['Pet'] == 'Cat']['Total_click'].sum()
+        descriptions = data['Description'].unique()
+        values = [data.loc[data['Description'] == d]['Total_click'].sum() for d in descriptions]
 
-        values = [total_dog_click,total_cat_click]
-        colors = [QColor("#A8ACE1"), QColor("#4F59EA")]
+        chars = '0123456789ABCDEF'
+        colors = [QColor('#'+''.join(random.sample(chars,6))) for i in range(len(values))]
         start_angle = 0
 
         # Dessiner chaque portion du pie chart
@@ -86,7 +92,7 @@ class ClickMetrics(QDialog):
         percentage = (values/total_click)*100
 
         # Ajouter une légende
-        legend = ["Dog", "Cat"]  # Exemple de légende
+        legend = descriptions  # Exemple de légende
         for i, label in enumerate(legend):
             text = QGraphicsTextItem(f'{label} : {percentage[i]:.1f} %')
             text.setDefaultTextColor(colors[i])
@@ -103,8 +109,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         uic.loadUi(r'MainWindow.ui',self)
-        self.df = None
-
+        
         # Connection des actions pour le menu File
         browse_action = self.findChild(QAction,'Browse')
         browse_action.triggered.connect(self.browse)
@@ -120,24 +125,49 @@ class MainWindow(QMainWindow):
         next_button = self.findChild(QPushButton,'NextButton') 
         next_button.clicked.connect(self.change_image)
 
-        # On créé la barre de statuts (de type QStatusBar) avec son message initial
+        # On créer la barre de statuts (de type QStatusBar) avec son message initial
         self.statusBar().showMessage("Label 0 : Initialisation") 
+
+        # On créer le fichier permettant d'enregister les clics
+        df = pd.DataFrame(columns=['Url','Description','Total_click','Valid','Not_valid'])
+        df.to_csv('metric/data.csv')
     
     # Action qui permet de charger le fichier csv avec les url des images
-    def browse(self):
+    def browse(self)->None:
+        """
+        It's a class method for load picture url database, like a csv file.
+        Browse the csv datafile with url and image description. The file muste have a "Url" and "Descritpion" columns names.
+
+        Args :
+            None
+        
+        Retrun : 
+            None
+        """
         self.statusBar().showMessage("Label 2 : Browse data file") 
-        file_filter = 'Data File (*.xlsx *.csv)'
+        file_filter = 'Data File (*.csv)'
         response = QFileDialog.getOpenFileName(
             parent = self,
             caption='Select a data file',
             directory=os.getcwd(),
             filter=file_filter,
         )
-        self.df = pd.read_csv(response[0],sep=';')
+
+        self.df = pd.read_csv(response[0],sep=',')
         self.change_image()
 
-    def set_picture_button(self):
+    def set_picture_button(self)->None:
+        """
+        This method request the image with the url and load the image on the button icon.
+
+        Args :
+            None
+        
+        Return :
+            None
+        """
         self.statusBar().showMessage("Label 3 : Set pictures") 
+
         # On sélectionne aléatoirement en fonction de la colonne description du fichier de données
         DESCRIPTIONS = list(self.df['Description'].unique())
         self.descriptions_selected = random.sample(DESCRIPTIONS,2)
@@ -148,7 +178,7 @@ class MainWindow(QMainWindow):
 
         self.image_attributions = dict()
 
-        for objectName,description in zip(BUTTONNAMES,self.descriptions_selected) :
+        for objectName,description in zip(BUTTON_NAMES,self.descriptions_selected) :
             frame = self.df.loc[self.df['Description']==description]
             row_selected = frame.sample(n=1)
 
@@ -181,9 +211,20 @@ class MainWindow(QMainWindow):
                 # Redimensionner le bouton pour qu'il corresponde à la taille de l'image
                 button.setFixedSize(image_width, image_height)
                 button.setIconSize(pixmap.rect().size())
+
         self.statusBar().showMessage("Label 1 : Waiting action") 
     
-    def check_image(self):
+    def check_image(self)->None:
+        """ 
+        It's a class method activate when the user click on a image.
+        This method check if the picture match with the captcha question.
+
+        Args :
+            None
+
+        Return :
+            None
+        """
         self.statusBar().showMessage("Label 4 : Check picture") 
         sender = self.sender() # Récupérer le bouton qui a émis le signal
         object_name = sender.objectName()
@@ -209,13 +250,23 @@ class MainWindow(QMainWindow):
         self.strore_click_metric(url,description,validstate)
         self.statusBar().showMessage("Label 1 : Waiting action") 
 
-    def change_image(self):
+    def change_image(self)->None:
         self.statusBar().showMessage("Label 5 : Next pictures") 
         question_label = self.findChild(QLabel,'validationLabel')
         question_label.setText('')
         self.set_picture_button()
     
-    def strore_click_metric(self,url:str,description:str,validstate:bool):
+    def strore_click_metric(self,url:str,description:str,validstate:bool)->None:
+        """
+        Storage the parameters of the image clicked
+
+        Args :
+            url (str) : A url of web image
+            description (str) : The word decription of the image
+            validstate (bool) : True if the image clicked is the rigth aswer
+        Returns :
+            None
+        """
         filepath = os.path.join(os.getcwd(),'metric','data.csv')
         df = pd.read_csv(filepath)
 
@@ -244,7 +295,6 @@ class MainWindow(QMainWindow):
     def display_metrics_window(self):
         if self.window is None:
             self.window = ClickMetrics()
-            self.window.finished.connect(self.deleteSecondWindow)
             self.window.show()
 
     def deleteSecondWindow(self):
