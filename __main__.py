@@ -20,7 +20,7 @@ RESOURCES = 'resources'
 class ClickMetrics(QDialog):
     
     def __init__(self):
-        print('oui')
+        
         super(ClickMetrics, self).__init__()
         uic.loadUi(r'Metrics.ui',self)
 
@@ -29,23 +29,49 @@ class ClickMetrics(QDialog):
         self.valid_label = self.findChild(QLabel,'validLabel')
         self.not_valid_label = self.findChild(QLabel,'notvalidLabel')
 
-        self.load_csv()
+        # Chargement du fichier contenant les statistiques
+        self.loadCsv()
 
         self.close_button = self.findChild(QPushButton,'closeButton')
         self.close_button.clicked.connect(self.closeDialog)
     
     def closeDialog(self):
+        """Change the image icon of push button
+
+        Args :
+            None
+
+        Return :
+            None
+        """
         self.accept()
 
-    def load_csv(self):
+    def loadCsv(self)->None:
+        """Load the csv file with click statistics
+
+        Args :
+            None
+
+        Return :
+            None
+        """
         filepath = os.path.join(os.getcwd(),'metric','data.csv')
         try:
             df = pd.read_csv(filepath)
-            self.display_data(df)
+            self.displayData(df)
         except Exception as e:
             print("Error loading CSV:", e)
 
-    def display_data(self, data):
+    def displayData(self, data)->None:
+        """Display the valid and not valid clicks.
+        Display with a pie chart the repartiotion click in terms of the image description.
+
+        Args :
+            None
+
+        Return :
+            None
+        """
         self.table_widget.setRowCount(data.shape[0])
         self.table_widget.setColumnCount(data.shape[1])
         self.table_widget.setHorizontalHeaderLabels(data.columns)
@@ -112,18 +138,21 @@ class MainWindow(QMainWindow):
         
         # Connection des actions pour le menu File
         browse_action = self.findChild(QAction,'Browse')
-        browse_action.triggered.connect(self.browse)
-
-        next_action = self.findChild(QAction,'Next') 
-        next_action.triggered.connect(self.change_image)
+        browse_action.triggered.connect(self.browseDatabase)
 
         # Connection des actions pour le menu Edit
         metric_action = self.findChild(QAction,'Metrics')
-        metric_action.triggered.connect(self.display_metrics_window)
+        metric_action.triggered.connect(self.displaymetricsWindow)
 
         # Connection du bouton Next pour changer les images
         next_button = self.findChild(QPushButton,'NextButton') 
-        next_button.clicked.connect(self.change_image)
+        next_button.clicked.connect(self.changeImage)
+
+        self.buttons = dict()
+        for objectname in BUTTON_NAMES :
+            button = self.findChild(QPushButton, objectname)
+            button.clicked.connect(self.checkImage) 
+            self.buttons[objectname] = button
 
         # On créer la barre de statuts (de type QStatusBar) avec son message initial
         self.statusBar().showMessage("Label 0 : Initialisation") 
@@ -133,7 +162,7 @@ class MainWindow(QMainWindow):
         df.to_csv('metric/data.csv')
     
     # Action qui permet de charger le fichier csv avec les url des images
-    def browse(self)->None:
+    def browseDatabase(self)->None:
         """
         It's a class method for load picture url database, like a csv file.
         Browse the csv datafile with url and image description. The file muste have a "Url" and "Descritpion" columns names.
@@ -154,9 +183,9 @@ class MainWindow(QMainWindow):
         )
 
         self.df = pd.read_csv(response[0],sep=',')
-        self.change_image()
+        self.changeImage()
 
-    def set_picture_button(self)->None:
+    def setpictureButton(self)->None:
         """
         This method request the image with the url and load the image on the button icon.
 
@@ -178,15 +207,12 @@ class MainWindow(QMainWindow):
 
         self.image_attributions = dict()
 
-        for objectName,description in zip(BUTTON_NAMES,self.descriptions_selected) :
+        for objectname,description in zip(BUTTON_NAMES,self.descriptions_selected) :
             frame = self.df.loc[self.df['Description']==description]
             row_selected = frame.sample(n=1)
 
             image_url = row_selected['Url'].values[0]
-            self.image_attributions[objectName] = {'Url':image_url,'Description':description,'Nbr_click':0}
-
-            button = self.findChild(QPushButton, objectName)
-            button.clicked.connect(self.check_image)       
+            self.image_attributions[objectname] = {'Url':image_url,'Description':description,'Nbr_click':0}
 
             # Télécharger l'image depuis l'URL
             response = requests.get(image_url)
@@ -206,17 +232,16 @@ class MainWindow(QMainWindow):
                 icon = QIcon(pixmap)
 
                 # Changer l'icône du bouton existant
-                button.setIcon(icon)
+                self.buttons[objectname].setIcon(icon)
 
                 # Redimensionner le bouton pour qu'il corresponde à la taille de l'image
-                button.setFixedSize(image_width, image_height)
-                button.setIconSize(pixmap.rect().size())
+                self.buttons[objectname].setFixedSize(image_width, image_height)
+                self.buttons[objectname].setIconSize(pixmap.rect().size())
 
         self.statusBar().showMessage("Label 1 : Waiting action") 
     
-    def check_image(self)->None:
-        """ 
-        It's a class method activate when the user click on a image.
+    def checkImage(self)->None:
+        """ It's a class method activate when the user click on a image.
         This method check if the picture match with the captcha question.
 
         Args :
@@ -247,18 +272,25 @@ class MainWindow(QMainWindow):
 
         url =self.image_attributions[object_name]['Url']
         description = self.image_attributions[object_name]['Description']
-        self.strore_click_metric(url,description,validstate)
+        self.stroreclickMetric(url,description,validstate)
         self.statusBar().showMessage("Label 1 : Waiting action") 
 
-    def change_image(self)->None:
+    def changeImage(self)->None:
+        """Change the image icon of push button
+
+        Args :
+            None
+
+        Return :
+            None
+        """
         self.statusBar().showMessage("Label 5 : Next pictures") 
         question_label = self.findChild(QLabel,'validationLabel')
         question_label.setText('')
-        self.set_picture_button()
+        self.setpictureButton()
     
-    def strore_click_metric(self,url:str,description:str,validstate:bool)->None:
-        """
-        Storage the parameters of the image clicked
+    def stroreclickMetric(self,url:str,description:str,validstate:bool)->None:
+        """Storage the parameters of the image clicked
 
         Args :
             url (str) : A url of web image
@@ -292,12 +324,27 @@ class MainWindow(QMainWindow):
         
         df.to_csv(filepath,index=False)
     
-    def display_metrics_window(self):
-        if self.window is None:
-            self.window = ClickMetrics()
-            self.window.show()
+    def displaymetricsWindow(self):
+        """Display with a button the metrics dashoard
 
-    def deleteSecondWindow(self):
+        Args :
+            None
+
+        Return :
+            None
+        """
+        self.window = ClickMetrics()
+        self.window.show()
+
+    def deletesecondWindow(self):
+        """Delete with a button the metrics dashoard
+
+        Args :
+            None
+
+        Return :
+            None
+        """
         self.window.deleteLater()
         self.window = None
 
