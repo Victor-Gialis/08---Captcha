@@ -252,12 +252,12 @@ class MainWindow(QMainWindow):
         """
         self.statusBar().showMessage("Label 4 : Check picture") 
         sender = self.sender() # Récupérer le bouton qui a émis le signal
-        object_name = sender.objectName()
+        objectname = sender.objectName()
 
         # On compte le nombre de clics par image
-        self.image_attributions[object_name]['Nbr_click'] += 1
+        self.image_attributions[objectname]['Nbr_click'] += 1
 
-        if self.image_attributions[object_name]['Description'] == self.true_description:
+        if self.image_attributions[objectname]['Description'] == self.true_description:
             print('click validate')
             validstate = True
             validationtext = 'Good job ! You find the good one !'
@@ -270,8 +270,8 @@ class MainWindow(QMainWindow):
         question_label = self.findChild(QLabel,'validationLabel')
         question_label.setText(validationtext)
 
-        url =self.image_attributions[object_name]['Url']
-        description = self.image_attributions[object_name]['Description']
+        url =self.image_attributions[objectname]['Url']
+        description = self.image_attributions[objectname]['Description']
         self.stroreclickMetric(url,description,validstate)
         self.statusBar().showMessage("Label 1 : Waiting action") 
 
