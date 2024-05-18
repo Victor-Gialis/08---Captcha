@@ -5,6 +5,7 @@ __date__ = "2024-03-04"
 __version__= "1.1"
 
 import os
+import csv
 import sys
 import random
 import requests
@@ -182,7 +183,8 @@ class MainWindow(QMainWindow):
             filter=file_filter,
         )
 
-        self.df = pd.read_csv(response[0],sep=',')
+        dialect = '     '
+        self.df = pd.read_csv(response[0],sep=dialect)
         self.changeImage()
 
     def setpictureButton(self)->None:
@@ -231,6 +233,24 @@ class MainWindow(QMainWindow):
                 # Changer l'icône du bouton existant
                 icon = QIcon(pixmap)
 
+                # Changer l'icône du bouton existant
+                self.buttons[objectname].setIcon(icon)
+
+                # Redimensionner le bouton pour qu'il corresponde à la taille de l'image
+                self.buttons[objectname].setFixedSize(image_width, image_height)
+                self.buttons[objectname].setIconSize(pixmap.rect().size())
+            
+            else :
+                # Convertir la réponse en pixmap
+                pixmap = QPixmap("images/404.jpg")
+
+                # Redimensionner l'image à la taille souhaitée
+                image_width = 245
+                image_height = 245
+                pixmap = pixmap.scaled(image_width, image_height)
+
+                # Changer l'icône du bouton existant
+                icon = QIcon(pixmap)
                 # Changer l'icône du bouton existant
                 self.buttons[objectname].setIcon(icon)
 
